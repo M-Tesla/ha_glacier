@@ -23,6 +23,8 @@
 #include "my_base.h"
 #include "glacier.h"
 
+#include <string>
+
 class Glacier_share : public Handler_share {
 public:
   mysql_mutex_t mutex;
@@ -47,6 +49,7 @@ class ha_glacier : public handler {
   int64_t batch_pos_;
   int64_t batch_len_;
   uint64_t current_row_;
+  std::string where_;
 
   Glacier_share *get_share();
   void release_batch();
@@ -55,7 +58,6 @@ class ha_glacier : public handler {
   int fail_free(char *err);
   int open_query();
   int pull_batch();
-  int write_record(int64_t batch_row);
 
 public:
   ha_glacier(handlerton *hton, TABLE_SHARE *table_arg);
@@ -63,8 +65,10 @@ public:
 
   ulonglong table_flags() const override
   {
-    return HA_NO_TRANSACTIONS | HA_REC_NOT_IN_SEQ | HA_BINLOG_STMT_CAPABLE;
+    return HA_NO_TRANSACTIONS | HA_REC_NOT_IN_SEQ | HA_BINLOG_STMT_CAPABLE |
+           HA_CAN_TABLE_CONDITION_PUSHDOWN;
   }
+  const char *open_path() const { return path_; }
   ulong index_flags(uint, uint, bool) const override { return 0; }
   uint max_supported_record_length() const override { return HA_MAX_REC_LENGTH; }
   uint max_supported_keys() const override { return 0; }
@@ -82,6 +86,9 @@ public:
   int rnd_pos(uchar *buf, uchar *pos) override;
   void position(const uchar *record) override;
   int info(uint) override;
+  int reset(void) override;
+  const COND *cond_push(const COND *cond) override;
+  void cond_pop() override;
   int external_lock(THD *thd, int lock_type) override;
   int delete_all_rows(void) override;
   int create(const char *name, TABLE *form, HA_CREATE_INFO *info) override;

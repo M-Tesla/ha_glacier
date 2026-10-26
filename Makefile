@@ -37,7 +37,7 @@ all: ha_glacier.so
 ha_glacier.so: ha_glacier.cc ha_glacier.h
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -o $@ ha_glacier.cc \
 		-L"$(GLACIER_LIBDIR)" -lglacier \
-		-Wl,-rpath,'$$ORIGIN/../Glacier/zig-out/lib'
+		-Wl,-rpath,'$(abspath $(GLACIER_LIBDIR))'
 
 clean:
 	rm -f ha_glacier.so
