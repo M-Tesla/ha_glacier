@@ -1457,8 +1457,8 @@ maria_declare_plugin(glacier){
     PLUGIN_LICENSE_GPL,
     glacier_plugin_init,
     NULL,
-    0x000603,
+    0x000700,
     NULL,
     NULL,
-    "0.6.3",
+    "0.7.0",
     MariaDB_PLUGIN_MATURITY_GAMMA} maria_declare_plugin_end;

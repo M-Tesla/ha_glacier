@@ -1,6 +1,6 @@
 # ha_glacier
 
-[Glacier](https://github.com/M-Tesla/Glacier) engine for MariaDB. GPL-2.0. Linking `libglacier.so` does not relicense that library. This plugin is 0.6.3. It links `libglacier.so` from Glacier 0.7.0, `api_version` 2.
+[Glacier](https://github.com/M-Tesla/Glacier) engine for MariaDB. GPL-2.0. Linking `libglacier.so` does not relicense that library. This plugin is 0.7.0. It links `libglacier.so` from Glacier 0.7.0, `api_version` 2.
 
 It runs in MariaDB 13.0.2. `INSTALL SONAME 'ha_glacier.so'`. MySQL does not load this `.so`.
 
