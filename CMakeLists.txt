@@ -45,6 +45,8 @@ target_compile_options(glacier PRIVATE -fno-strict-aliasing)
 target_compile_features(glacier PRIVATE cxx_std_17)
 set_target_properties(glacier PROPERTIES
   BUILD_RPATH "${GLACIER_LIBDIR_REAL}"
-  INSTALL_RPATH "$ORIGIN:${GLACIER_LIBDIR_REAL}")
+  INSTALL_RPATH "$ORIGIN/.."
+  INSTALL_RPATH_USE_LINK_PATH FALSE)
+install(FILES "${GLACIER_LIBRARY}" DESTINATION lib)
 
 include(CPack)
