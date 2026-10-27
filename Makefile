@@ -1,6 +1,7 @@
-# ha_glacier.so is a MariaDB 13.0.2 storage engine. It is GPL because it
-# includes MariaDB server headers. It does not live in the Glacier tree.
-# MySQL will not load the resulting shared library.
+# ha_glacier.so is a MariaDB storage engine. It is GPL because it includes
+# MariaDB server headers. It does not live in the Glacier tree. MySQL will
+# not load the resulting shared library. One prefix, one .so: point
+# MARIADB_ROOT and MARIADB_SRC at the line you are building.
 
 -include Makefile.local
 
@@ -11,10 +12,10 @@ GLACIER_INCLUDE ?= ../Glacier/include
 GLACIER_LIBDIR ?= ../Glacier/zig-out/lib
 
 ifeq ($(strip $(MARIADB_ROOT)),)
-$(error Set MARIADB_ROOT to a MariaDB 13.0.2 prefix with include/mysql/server)
+$(error Set MARIADB_ROOT to a MariaDB prefix with include/mysql/server)
 endif
 ifeq ($(strip $(MARIADB_SRC)),)
-$(error Set MARIADB_SRC to the MariaDB 13.0.2 source tree, for the wsrep headers)
+$(error Set MARIADB_SRC to the matching MariaDB source tree, for the wsrep headers)
 endif
 
 MARIADB_INC := $(MARIADB_ROOT)/include/mysql/server

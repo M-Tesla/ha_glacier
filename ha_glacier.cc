@@ -73,6 +73,16 @@ Glacier_share::Glacier_share()
   mysql_mutex_init(glacier_share_mutex_key, &mutex, MY_MUTEX_INIT_FAST);
 }
 
+struct ha_table_option_struct {
+  char *path;
+};
+
+static ha_create_table_option glacier_table_options[] = {
+    HA_TOPTION_STRING("CONNECTION", path), HA_TOPTION_END};
+
+static const char glacier_need_path[] =
+    "table needs CONNECTION='...' of a Parquet file, an Iceberg table, or a warehouse";
+
 static int
 glacier_plugin_init(void *p)
 {
@@ -82,6 +92,7 @@ glacier_plugin_init(void *p)
   glacier_hton = hton;
   hton->create = glacier_create_handler;
   hton->create_select = glacier_create_select;
+  hton->table_options = glacier_table_options;
   hton->flags = HTON_CAN_RECREATE;
   hton->tablefile_extensions = ha_glacier_exts;
   return 0;
@@ -123,6 +134,44 @@ ha_glacier::get_share()
   }
   unlock_shared_ha_data();
   return tmp;
+}
+
+static void trim_inplace(char *s);
+
+static bool
+path_blank(const char *src)
+{
+  if (src == NULL)
+    return true;
+  while (*src == ' ' || *src == '\t' || *src == '\n' || *src == '\r')
+    src++;
+  return *src == '\0';
+}
+
+static int
+copy_path(char **dest, const char *src)
+{
+  size_t n;
+  char *copy;
+
+  if (path_blank(src))
+    return glacier_row_fail(glacier_need_path);
+  n = strlen(src);
+  if (n > 16384)
+    return glacier_row_fail(glacier_need_path);
+  copy = (char *) malloc(n + 1);
+  if (copy == NULL)
+    return HA_ERR_OUT_OF_MEM;
+  memcpy(copy, src, n + 1);
+  trim_inplace(copy);
+  if (copy[0] == '\0')
+  {
+    free(copy);
+    return glacier_row_fail(glacier_need_path);
+  }
+  free(*dest);
+  *dest = copy;
+  return 0;
 }
 
 static void
@@ -470,7 +519,8 @@ ha_glacier::release_scan()
 int
 ha_glacier::open(const char *name, int mode, uint test_if_locked)
 {
-  const LEX_CSTRING comment = table->s->comment;
+  const char *opt = (option_struct != NULL) ? option_struct->path : NULL;
+  int rc;
 
   (void) name;
   (void) mode;
@@ -478,18 +528,8 @@ ha_glacier::open(const char *name, int mode, uint test_if_locked)
   if (!(share_ = get_share()))
     return HA_ERR_OUT_OF_MEM;
   thr_lock_data_init(&share_->lock, &lock_, NULL);
-  if (comment.str == NULL || comment.length == 0 || comment.length > 16384)
-    return glacier_row_fail("table needs COMMENT='path' of a Parquet file, an Iceberg table, or a warehouse");
-  free(path_);
-  path_ = (char *) malloc(comment.length + 1);
-  if (path_ == NULL)
-    return HA_ERR_OUT_OF_MEM;
-  memcpy(path_, comment.str, comment.length);
-  path_[comment.length] = '\0';
-  trim_inplace(path_);
-  if (path_[0] == '\0')
-    return glacier_row_fail("table needs COMMENT='path' of a Parquet file, an Iceberg table, or a warehouse");
-  return 0;
+  rc = copy_path(&path_, opt);
+  return rc;
 }
 
 int
@@ -576,9 +616,14 @@ ha_glacier::cond_pop()
 int
 ha_glacier::create(const char *name, TABLE *, HA_CREATE_INFO *create_info)
 {
+  const char *opt;
+
   (void) name;
-  if (create_info->comment.str == NULL || create_info->comment.length == 0)
-    return glacier_row_fail("CREATE TABLE needs COMMENT='path' of a Parquet file, an Iceberg table, or a warehouse");
+  opt = (create_info != NULL && create_info->option_struct != NULL)
+            ? create_info->option_struct->path
+            : NULL;
+  if (path_blank(opt) || strlen(opt) > 16384)
+    return glacier_row_fail(glacier_need_path);
   return 0;
 }
 
@@ -600,7 +645,7 @@ ha_glacier::open_query()
 
   release_scan();
   if (path_ == NULL || path_[0] == '\0')
-    return glacier_row_fail("table has no COMMENT path");
+    return glacier_row_fail("table has no CONNECTION path");
   if (glacier_api_version() != GLACIER_API_VERSION)
     return glacier_row_fail("libglacier API does not match this plugin");
   if (table->field == NULL)
