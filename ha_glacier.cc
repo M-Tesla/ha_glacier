@@ -519,7 +519,20 @@ ha_glacier::release_scan()
 int
 ha_glacier::open(const char *name, int mode, uint test_if_locked)
 {
-  const char *opt = (option_struct != NULL) ? option_struct->path : NULL;
+  /*
+   * 12.0 stores CONNECTION in the handler option. 11.4 and 11.8 still
+   * parse CONNECTION as the table connect string and keep it on the share.
+   */
+  const char *opt = NULL;
+#if MYSQL_VERSION_ID >= 120000
+  if (option_struct != NULL)
+    opt = option_struct->path;
+#else
+  if (table != NULL && table->s != NULL && table->s->connect_string.length > 0)
+    opt = table->s->connect_string.str;
+  else if (table != NULL && table->s != NULL && table->s->option_struct != NULL)
+    opt = table->s->option_struct->path;
+#endif
   int rc;
 
   (void) name;
@@ -616,12 +629,16 @@ ha_glacier::cond_pop()
 int
 ha_glacier::create(const char *name, TABLE *, HA_CREATE_INFO *create_info)
 {
-  const char *opt;
+  const char *opt = NULL;
 
   (void) name;
-  opt = (create_info != NULL && create_info->option_struct != NULL)
-            ? create_info->option_struct->path
-            : NULL;
+  if (create_info != NULL && create_info->option_struct != NULL)
+    opt = create_info->option_struct->path;
+#if MYSQL_VERSION_ID < 120000
+  if (path_blank(opt) && create_info != NULL &&
+      create_info->connect_string.length > 0)
+    opt = create_info->connect_string.str;
+#endif
   if (path_blank(opt) || strlen(opt) > 16384)
     return glacier_row_fail(glacier_need_path);
   return 0;

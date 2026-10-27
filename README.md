@@ -10,7 +10,7 @@ CREATE TABLE orders (id BIGINT, note TEXT)
 SELECT SUM(id) FROM orders WHERE id > 1;
 ```
 
-`CONNECTION` is a Parquet file, an Iceberg table, or a warehouse. `COMMENT` stays a comment. On a warehouse, the MariaDB database and table name are the Glacier name, so `sales.orders` reads `sales.orders`. A single-table `SELECT` with `COUNT`, `SUM`, `MIN`, `MAX`, `AVG`, and a simple `WHERE` runs as one Glacier statement. A join with another engine stays in MariaDB and scans the Glacier side. Writes are refused.
+`CONNECTION` is a Parquet file, an Iceberg table, or a warehouse. On MariaDB 11.4 and 11.8 that clause is the table connect string. From 12.3 it is an engine option. The statement above is the same either way. `COMMENT` stays a comment. On a warehouse, the MariaDB database and table name are the Glacier name, so `sales.orders` reads `sales.orders`. A single-table `SELECT` with `COUNT`, `SUM`, `MIN`, `MAX`, `AVG`, and a simple `WHERE` runs as one Glacier statement. A join with another engine stays in MariaDB and scans the Glacier side. Writes are refused.
 
 ## Build
 
