@@ -20,6 +20,7 @@ endif
 
 MARIADB_INC := $(MARIADB_ROOT)/include/mysql/server
 MARIADB_PRIVATE := $(MARIADB_INC)/private
+GLACIER_RPATH := $(shell cd "$(GLACIER_LIBDIR)" && pwd)
 
 CXX ?= g++
 CXXFLAGS ?= -O2 -fPIC -std=gnu++17 -fno-strict-aliasing -Wall -Wno-unused-parameter
@@ -38,7 +39,7 @@ all: ha_glacier.so
 ha_glacier.so: ha_glacier.cc ha_glacier.h
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -o $@ ha_glacier.cc \
 		-L"$(GLACIER_LIBDIR)" -lglacier \
-		-Wl,-rpath,'$(abspath $(GLACIER_LIBDIR))'
+		-Wl,-rpath,'$(GLACIER_RPATH)'
 
 clean:
 	rm -f ha_glacier.so

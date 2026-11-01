@@ -20,6 +20,7 @@
 #include "sql_select.h"
 #include "select_handler.h"
 #include "item_func.h"
+#include "item_cmpfunc.h"
 #include "item_sum.h"
 #include "unireg.h"
 
@@ -356,6 +357,19 @@ deparse_sum(std::string *out, Item *item)
 }
 
 static bool
+deparse_atom(std::string *out, Item *item)
+{
+  std::string tmp;
+
+  if (append_field(&tmp, item) || append_literal(&tmp, item))
+  {
+    *out += tmp;
+    return true;
+  }
+  return false;
+}
+
+static bool
 deparse_expr(std::string *out, Item *item)
 {
   item = bare_item(item);
@@ -386,18 +400,89 @@ deparse_cond(std::string *out, Item *item)
     if (func->functype() == Item_func::COND_AND_FUNC ||
         func->functype() == Item_func::COND_OR_FUNC)
     {
+      Item_cond *cond = static_cast<Item_cond *>(item);
+      List_iterator<Item> it(*cond->argument_list());
+      Item *arg;
+      bool any = false;
+
       op = func->functype() == Item_func::COND_AND_FUNC ? " AND " : " OR ";
-      if (func->argument_count() == 0)
-        return false;
-      for (i = 0; i < func->argument_count(); i++)
+      while ((arg = it++))
       {
-        if (i)
+        if (any)
           *out += op;
         *out += "(";
-        if (!deparse_cond(out, func->arguments()[i]))
+        if (!deparse_cond(out, arg))
           return false;
         *out += ")";
+        any = true;
       }
+      return any;
+    }
+    if (func->functype() == Item_func::NOT_FUNC && func->argument_count() == 1)
+    {
+      *out += "NOT (";
+      if (!deparse_cond(out, func->arguments()[0]))
+        return false;
+      *out += ")";
+      return true;
+    }
+    if (func->functype() == Item_func::BETWEEN && func->argument_count() == 3)
+    {
+      Item_func_opt_neg *neg = static_cast<Item_func_opt_neg *>(func);
+
+      if (neg->negated)
+        *out += "NOT (";
+      if (!deparse_atom(out, func->arguments()[0]))
+        return false;
+      *out += " BETWEEN ";
+      if (!deparse_atom(out, func->arguments()[1]))
+        return false;
+      *out += " AND ";
+      if (!deparse_atom(out, func->arguments()[2]))
+        return false;
+      if (neg->negated)
+        *out += ")";
+      return true;
+    }
+    if (func->functype() == Item_func::IN_FUNC && func->argument_count() >= 2)
+    {
+      Item_func_opt_neg *neg = static_cast<Item_func_opt_neg *>(func);
+
+      if (!deparse_atom(out, func->arguments()[0]))
+        return false;
+      *out += neg->negated ? " NOT IN (" : " IN (";
+      for (i = 1; i < func->argument_count(); i++)
+      {
+        if (i > 1)
+          *out += ", ";
+        if (!deparse_atom(out, func->arguments()[i]))
+          return false;
+      }
+      *out += ")";
+      return true;
+    }
+    if (func->functype() == Item_func::LIKE_FUNC && func->argument_count() == 2)
+    {
+      Item_func_like *like = static_cast<Item_func_like *>(func);
+
+      if (like->negated)
+        *out += "NOT (";
+      if (!deparse_atom(out, func->arguments()[0]))
+        return false;
+      *out += " LIKE ";
+      if (!deparse_atom(out, func->arguments()[1]))
+        return false;
+      if (like->escape > 0 && like->escape < 128)
+      {
+        *out += " ESCAPE '";
+        if (like->escape == '\'')
+          *out += "''";
+        else
+          *out += static_cast<char>(like->escape);
+        *out += "'";
+      }
+      if (like->negated)
+        *out += ")";
       return true;
     }
     if (func->functype() == Item_func::ISNULL_FUNC && func->argument_count() == 1)
@@ -1519,8 +1604,8 @@ maria_declare_plugin(glacier){
     PLUGIN_LICENSE_GPL,
     glacier_plugin_init,
     NULL,
-    0x000700,
+    0x000702,
     NULL,
     NULL,
-    "0.7.0",
+    "0.7.2",
     MariaDB_PLUGIN_MATURITY_GAMMA} maria_declare_plugin_end;
